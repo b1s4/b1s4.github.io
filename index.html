@@ -1,45 +1,101 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Website Under Development</title>
-    <style>
-        body {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f0f0;
-            font-family: Arial, sans-serif;
-            color: #333;
-        }
-
-        h1 {
-            margin-bottom: 20px;
-        }
-
-        .loader {
-            border: 16px solid #f3f3f3; /* Light grey */
-            border-top: 16px solid #3498db; /* Blue */
-            border-radius: 50%;
-            width: 120px;
-            height: 120px;
-            animation: spin 2s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
+    <title>Descargar Imágenes de Reddit</title>
 </head>
 <body>
+    <h1>Descargar Imágenes de un Post de Reddit</h1>
+    <label for="reddit-url">Introduce el enlace del post de Reddit:</label>
+    <input type="text" id="reddit-url" placeholder="https://www.reddit.com/r/subreddit/comments/post_id">
+    <button onclick="downloadImages()">Descargar Imágenes</button>
+    <div id="image-links"></div>
 
-    <h1>Website under development</h1>
-    <div class="loader"></div>
+    <script>
+        async function downloadImages() {
+            const postUrl = document.getElementById('reddit-url').value;
+            const postId = extractPostId(postUrl);
 
+            if (!postId) {
+                alert('Por favor, introduce un enlace válido de un post de Reddit.');
+                return;
+            }
+
+            const apiUrl = `https://www.reddit.com/comments/${postId}.json`;
+
+            try {
+                const response = await fetch(apiUrl);
+                const postData = await response.json();
+                const images = extractImageLinks(postData);
+
+                if (images.length > 0) {
+                    displayAndDownloadImages(images);
+                } else {
+                    alert('No se encontraron imágenes en este post.');
+                }
+            } catch (error) {
+                console.error('Error al obtener datos del post:', error);
+                alert('Hubo un error al obtener las imágenes.');
+            }
+        }
+
+        function extractPostId(url) {
+            const regex = /comments\/([a-z0-9]+)/;
+            const match = url.match(regex);
+            return match ? match[1] : null;
+        }
+
+        function extractImageLinks(postData) {
+            const images = [];
+            const post = postData[0].data.children[0].data;
+
+            // Para imágenes de la galería o imágenes directas
+            if (post.gallery_data) {
+                const mediaMetadata = post.media_metadata;
+                for (let key in mediaMetadata) {
+                    if (mediaMetadata[key].s) {
+                        const imageUrl = mediaMetadata[key].s.u.replace(/&amp;/g, '&');
+                        images.push(imageUrl);
+                    }
+                }
+            } else if (post.url && post.url.match(/\.(jpeg|jpg|png|gif)$/)) {
+                images.push(post.url);
+            }
+
+            return images;
+        }
+
+        function displayAndDownloadImages(images) {
+            const container = document.getElementById('image-links');
+            container.innerHTML = '';  // Limpiar resultados previos
+
+            images.forEach((imageUrl, index) => {
+                const link = document.createElement('a');
+                link.href = imageUrl;
+                link.download = `image${index + 1}`;
+                link.innerText = `Descargar Imagen ${index + 1}`;
+                link.style.display = 'block';
+                container.appendChild(link);
+
+                // Descargar automáticamente cada imagen
+                const img = new Image();
+                img.src = imageUrl;
+                img.crossOrigin = "anonymous";
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+
+                    const a = document.createElement('a');
+                    a.href = canvas.toDataURL('image/jpeg');
+                    a.download = `image${index + 1}.jpg`;
+                    a.click();
+                };
+            });
+        }
+    </script>
 </body>
 </html>
